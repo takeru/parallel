@@ -226,11 +226,14 @@ module Parallel
 
           with_instrumentation items[index], index, options do
             begin
-              results[index] = call_with_index(items, index, options, &block)
+              result = call_with_index(items, index, options, &block)
             rescue Exception => e
               exception = e
               break
             end
+          end
+          unless options[:preserve_results] == false # avoid GC overhead of passing large results around
+            results[index] = result
           end
         end
       end
@@ -260,7 +263,9 @@ module Parallel
               if ExceptionWrapper === output
                 exception = output.exception
               else
-                results[index] = output
+                unless options[:preserve_results] == false
+                  results[index] = output
+                end
               end
             end
           ensure
@@ -382,12 +387,7 @@ module Parallel
     def call_with_index(array, index, options, &block)
       args = [array[index]]
       args << index if options[:with_index]
-      if options[:preserve_results] == false
-        block.call(*args)
-        nil # avoid GC overhead of passing large results around
-      else
-        block.call(*args)
-      end
+      block.call(*args)
     end
 
     def with_instrumentation(item, index, options)
